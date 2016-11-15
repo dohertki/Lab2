@@ -25,20 +25,67 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <dirent.h>     //opendir() and readdir()
+
+
+int setPort(int argc_a, char **argv_a, int *port_a);
+
+/******************************************************************
+ * Function: listDirectory()
+ *
+ * Use:  
+ *      
+ *
+ * Input: 
+ *       
+ * Output: 
+ *
+ ******************************************************************/
+void listDirectory(){
+
+	DIR *dirPtr;
+	struct dirent *mydirectory;
+	dirPtr = opendir(".");
+    if (dirPtr == NULL){
+        //strerr
+        return;
+    }
+    
+    while(1){
+        mydirectory = readdir(dirPtr);
+        if(mydirectory == NULL)
+            break;
+        if(strcmp(mydirectory->d_name, ".") == 0){
+            printf("continue\n");
+            continue;
+        }
+
+
+        printf("%s\n", mydirectory->d_name);
+    }
+    
 
 
 
-int setAddress(int argc_a, char **argv_a, int *port_a, char *myserver_a);
+
+	return;
+}
+
+
+
+
 
 int main(int argc, char *argv[]){
 
     char local_server[30];
     int port;
     int flag;
+    int socket_fd;
 
-    flag = setAddress(argc, argv, &port, local_server);
 
-    printf("%s, %d", local_server, port);
+    flag = setPort(argc, argv, &port);
+    listDirectory();
+    printf("%d",  port);
 
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(socket_fd < 0){
@@ -58,12 +105,22 @@ int main(int argc, char *argv[]){
 
 
 
-
-int setPort(int argc_a, char **argv_a, int *port_a, char *myserver_a){
+/******************************************************************
+ * Function: 
+ *
+ * Use:  
+ *      
+ *
+ * Input: 
+ *       
+ * Output: 
+ *
+ ******************************************************************/
+int setPort(int argc_a, char **argv_a, int *port_a){
     int flag =1;
     printf("args %d\n", argc_a);
     if(argc_a == 2){
-        *port_a = atoi(argv_a[i]);
+        *port_a = atoi(argv_a[1]);
     
     }else{
         printf("Clientchat usage:  ./ftserve [server-port#]\n");
