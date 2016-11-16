@@ -30,46 +30,7 @@
 
 int setPort(int argc_a, char **argv_a, int *port_a);
 
-/******************************************************************
- * Function: listDirectory()
- *
- * Use:  
- *      
- *
- * Input: 
- *       
- * Output: 
- *
- ******************************************************************/
-void listDirectory(){
-
-	DIR *dirPtr;
-	struct dirent *mydirectory;
-	dirPtr = opendir(".");
-    if (dirPtr == NULL){
-        //strerr
-        return;
-    }
-    
-    while(1){
-        mydirectory = readdir(dirPtr);
-        if(mydirectory == NULL)
-            break;
-        if(strcmp(mydirectory->d_name, ".") == 0){
-            printf("continue\n");
-            continue;
-        }
-
-
-        printf("%s\n", mydirectory->d_name);
-    }
-    
-
-
-
-
-	return;
-}
+void listDirectory();
 
 
 
@@ -131,3 +92,42 @@ int setPort(int argc_a, char **argv_a, int *port_a){
 
 }
 
+/******************************************************************
+ * Function: listDirectory()
+ *
+ * Use:  
+ *      
+ *
+ * Input: 
+ *       
+ * Output: 
+ *
+ ******************************************************************/
+void listDirectory(){
+
+	DIR *dirPtr;
+	struct dirent *mydirectory;
+	dirPtr = opendir(".");
+    if (dirPtr == NULL){
+        //strerr
+        return;
+    }
+    
+    while(1){
+        mydirectory = readdir(dirPtr);
+        if(mydirectory == NULL)
+            break;
+        
+     //   printf("@[0]: %c\n", mydirectory->d_name[0]);
+        if(strncmp(mydirectory->d_name, ".", 1) == 0  ){
+      //      printf("continue\n");
+      //      printf("passed name: %s\n", mydirectory->d_name);
+            continue;
+        }
+
+
+        printf("dir name: %s\n", mydirectory->d_name);
+    }
+    
+	return;
+}
