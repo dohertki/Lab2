@@ -1,5 +1,4 @@
 
-
 /***************************************************************
  * Kierin Doherty (dohertki)
  *
@@ -7,12 +6,10 @@
  *
  * input: $ ftserver <Port #> 
  *
- * output: Server unencrypts message passed to it by the 
- *         the key passed via same socket and returns 
- *         a plaintext message
+ * output: Server transfers files to a client. File must be in
+ *         the same directory as the the server.
  *
  **************************************************************/
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,11 +23,11 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <dirent.h>     //opendir() and readdir()
-
+#include <pthread.h>
 
 int setPort(int argc_a, char **argv_a, int *port_a);
 
-void listDirectory();
+void listDirectory(char **lDir_buff);
 
 
 
@@ -42,11 +39,24 @@ int main(int argc, char *argv[]){
     int port;
     int flag;
     int socket_fd;
-
+	int newsock_fd;
+    
+    char *workingBuffer;
 
     flag = setPort(argc, argv, &port);
-    listDirectory();
-    printf("%d",  port);
+    listDirectory(&workingBuffer);
+    printf("%d\n",  port);
+    printf("dir name: %s\n", workingBuffer );
+
+//*****************************************************************
+
+    socklen_t clilen;
+    struct sockaddr_in serv_addr, cli_addr;
+
+	bzero((char *) &serv_addr, sizeof(serv_addr)); //free memory  serv_addr
+	serv_addr.sin_family =  AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(port);
 
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(socket_fd < 0){
@@ -54,8 +64,17 @@ int main(int argc, char *argv[]){
         exit(1);
     }
 
+    
+	if (bind(socket_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+		perror("ERROR on binding");
 
 
+    listen(socket_fd,5); // listening socket
+    clilen = sizeof(cli_addr);
+	
+	newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
+	if (newsock_fd < 0) 
+		perror("ERROR on accept");
 
 
 
@@ -98,14 +117,17 @@ int setPort(int argc_a, char **argv_a, int *port_a){
  * Use:  
  *      
  *
- * Input: 
+ * Input: char **lDir_buff: Pointer to a char Pointer holding a buffer
+ *            with directory contents.
  *       
  * Output: 
  *
  ******************************************************************/
-void listDirectory(){
-
-	DIR *dirPtr;
+void listDirectory(char **lDir_buff){
+    //check for Null pointer here.
+    *lDir_buff = malloc(sizeof(char)*100);
+	
+    DIR *dirPtr;
 	struct dirent *mydirectory;
 	dirPtr = opendir(".");
     if (dirPtr == NULL){
@@ -126,8 +148,12 @@ void listDirectory(){
         }
 
 
-        printf("dir name: %s\n", mydirectory->d_name);
-    }
+    printf("dir name: %s\n", mydirectory->d_name);
     
+    strcat(*lDir_buff, mydirectory->d_name);    
+    strcat(*lDir_buff, "\n");
+
+    }
+    printf("dir name: %s\n", *lDir_buff );
 	return;
 }
