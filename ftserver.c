@@ -30,7 +30,38 @@ int setPort(int argc_a, char **argv_a, int *port_a);
 void listDirectory(char **lDir_buff);
 
 
+void sendMessage(int sock_fd, char* buffer_s);
 
+void beanbagchair(char *c_flag, int c_sockfd){
+
+    //need to set up as char switch will no accept a char*
+    // this should be in a new thread or process
+    char flag;
+
+
+    switch(flag){
+        case 'g':
+            printf("get file\n");
+            //connect to link Q FIXME
+            //send file of link Q FIXME
+            //close Q FIXME
+            break;
+
+        case 'l':
+            printf("list file\n");
+            //connect to link Q FIXME
+            // call listDirectory()
+            // call sendMessage{
+            //send directory on link Q
+            //close Q
+            break;
+
+        default:
+            printf("errror\n");
+            
+   }
+    return;
+}
 
 
 int main(int argc, char *argv[]){
@@ -38,10 +69,15 @@ int main(int argc, char *argv[]){
     char local_server[30];
     int port;
     int flag;
+    int n;
     int socket_fd;
 	int newsock_fd;
-    
+    char header[128];
     char *workingBuffer;
+    char client_flag[32];
+    char filename[128];
+    int data_port;
+    int words;
 
     flag = setPort(argc, argv, &port);
     listDirectory(&workingBuffer);
@@ -49,7 +85,7 @@ int main(int argc, char *argv[]){
     printf("dir name: %s\n", workingBuffer );
 
 //*****************************************************************
-
+//
     socklen_t clilen;
     struct sockaddr_in serv_addr, cli_addr;
 
@@ -75,8 +111,22 @@ int main(int argc, char *argv[]){
 	newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
 	if (newsock_fd < 0) 
 		perror("ERROR on accept");
+//this is where fork was
+//case 0:  //This is the child
+            bzero(header,128);
+           //Read the header from the client 		   
+            n = read(newsock_fd,header,128); //read the header 
+            if (n < 0){
+                perror("ERROR reading from socket");
+                close(newsock_fd);
+                exit(1);               
+            }
+            sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
+
+           printf("%s", client_flag); 
 
 
+    sendMessage(newsock_fd, workingBuffer);
 
 
     return 0;    
@@ -114,11 +164,12 @@ int setPort(int argc_a, char **argv_a, int *port_a){
 /******************************************************************
  * Function: listDirectory()
  *
- * Use:  
+ * Use: Funciton places a list of current working directory contents
+ *      into a buffer.
  *      
  *
  * Input: char **lDir_buff: Pointer to a char Pointer holding a buffer
- *            with directory contents.
+ *            with list directory contents.
  *       
  * Output: 
  *
@@ -148,7 +199,7 @@ void listDirectory(char **lDir_buff){
         }
 
 
-    printf("dir name: %s\n", mydirectory->d_name);
+    //printf("dir name: %s\n", mydirectory->d_name);
     
     strcat(*lDir_buff, mydirectory->d_name);    
     strcat(*lDir_buff, "\n");
@@ -156,4 +207,32 @@ void listDirectory(char **lDir_buff){
     }
     printf("dir name: %s\n", *lDir_buff );
 	return;
+}
+
+
+/******************************************************************
+ * Function: 
+ *
+ * Use:  
+ *      
+ *
+ * Input: 
+ *       
+ * Output: 
+ *
+ ******************************************************************/
+
+void sendMessage(int sock_fd, char* buffer_s){
+    int n;
+
+    printf("sizeof: %d\n", (int)sizeof(buffer_s)); 
+    printf("strlen: %d\n", (int)strlen(buffer_s));
+
+    n = send(sock_fd, buffer_s, strlen(buffer_s), 0); 
+//    n = write(newsock_fd, workingBuffer, sizeof(workingBuffer)); //Write back the type of server
+            if (n < 0){
+                perror("ERROR writing to socket");
+            }
+    return;
+
 }
