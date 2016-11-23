@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/wait.h>
@@ -28,7 +29,11 @@
 int setPort(int argc_a, char **argv_a, int *port_a);
 
 void listDirectory(char **lDir_buff);
+void testFunction(){
+    printf("Test function is working\n");
+    return;
 
+}
 
 void sendMessage(int sock_fd, char* buffer_s);
 
@@ -38,6 +43,7 @@ void beanbagchair(char *c_flag, int c_sockfd){
     // this should be in a new thread or process
     char flag;
 
+   char *ar_Buffer;
 
     switch(flag){
         case 'g':
@@ -51,6 +57,7 @@ void beanbagchair(char *c_flag, int c_sockfd){
             printf("list file\n");
             //connect to link Q FIXME
             // call listDirectory()
+            listDirectory(&ar_Buffer);
             // call sendMessage{
             //send directory on link Q
             //close Q
@@ -64,6 +71,57 @@ void beanbagchair(char *c_flag, int c_sockfd){
 }
 
 
+
+void *arbiter(void *s_th){
+    
+    printf("Entered thread 2 line 79\n");
+    int n;
+    char header[128];
+    char client_flag[32];
+    int data_port;
+    char filename[128];
+    int words;
+    int socket_th = (intptr_t)s_th;
+    testFunction(); 
+    printf("Thread ptr: %d \n", socket_th);
+    /*http://stackoverflow.com/questions/8487380
+     /how-to-cast-an-integer-to-void-pointer                */
+   char *ar_Buffer;
+    
+   // listDirectory(&ar_Buffer);
+    //printf("dir name: %s\n", workingBuffer );
+
+    bzero(header,128);
+    //Read the header from the client 		   
+    n = read(socket_th,header,128); //read the header 
+    if (n < 0){
+        perror("ERROR reading from socket");
+        close(socket_th);
+        exit(1);               
+    }
+    sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
+
+    printf("%s", client_flag); 
+
+
+    sendMessage(socket_th, ar_Buffer);
+
+    
+    //pthread_exit(NULL);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
 int main(int argc, char *argv[]){
 
     char local_server[30];
@@ -72,17 +130,8 @@ int main(int argc, char *argv[]){
     int n;
     int socket_fd;
 	int newsock_fd;
-    char header[128];
-    char *workingBuffer;
-    char client_flag[32];
-    char filename[128];
-    int data_port;
-    int words;
 
     flag = setPort(argc, argv, &port);
-    listDirectory(&workingBuffer);
-    printf("%d\n",  port);
-    printf("dir name: %s\n", workingBuffer );
 
 //*****************************************************************
 //
@@ -105,28 +154,34 @@ int main(int argc, char *argv[]){
 		perror("ERROR on binding");
 
 
+    printf("Socket returns ptr: %d\n", socket_fd);
     listen(socket_fd,5); // listening socket
     clilen = sizeof(cli_addr);
-	
-	newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
+/***************************************************************************
+****************************************************************************
+********************** This is where the magic happens *********************
+****************************************************************************
+***************************************************************************/
+    int newsock_t; //maybe an array?
+
+    newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
 	if (newsock_fd < 0) 
-		perror("ERROR on accept");
+        perror("ERROR on accept");
+ //   https://computing.llnl.gov/tutorials/pthreads/    
+    printf("Accept returns ptr: %d\n", newsock_fd);
+    pthread_t thread[10];
+    n = pthread_create(&thread[0], NULL, arbiter, (void*)(intptr_t)newsock_fd);
+    printf("Thread returns: %d, socket ptr: %d\n", n,  newsock_fd);
+
+
+
 //this is where fork was
 //case 0:  //This is the child
-            bzero(header,128);
-           //Read the header from the client 		   
-            n = read(newsock_fd,header,128); //read the header 
-            if (n < 0){
-                perror("ERROR reading from socket");
-                close(newsock_fd);
-                exit(1);               
-            }
-            sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
 
-           printf("%s", client_flag); 
+    while(1){
 
-
-    sendMessage(newsock_fd, workingBuffer);
+    }
+    printf("End\n");
 
 
     return 0;    
@@ -135,7 +190,7 @@ int main(int argc, char *argv[]){
 
 
 
-/******************************************************************
+/***************************************************************************
  * Function: 
  *
  * Use:  
@@ -145,7 +200,7 @@ int main(int argc, char *argv[]){
  *       
  * Output: 
  *
- ******************************************************************/
+ ***************************************************************************/
 int setPort(int argc_a, char **argv_a, int *port_a){
     int flag =1;
     printf("args %d\n", argc_a);
@@ -161,7 +216,7 @@ int setPort(int argc_a, char **argv_a, int *port_a){
 
 }
 
-/******************************************************************
+/***************************************************************************
  * Function: listDirectory()
  *
  * Use: Funciton places a list of current working directory contents
@@ -173,7 +228,7 @@ int setPort(int argc_a, char **argv_a, int *port_a){
  *       
  * Output: 
  *
- ******************************************************************/
+ ***************************************************************************/
 void listDirectory(char **lDir_buff){
     //check for Null pointer here.
     *lDir_buff = malloc(sizeof(char)*100);
@@ -199,7 +254,7 @@ void listDirectory(char **lDir_buff){
         }
 
 
-    //printf("dir name: %s\n", mydirectory->d_name);
+    printf("dir name: %s\n", mydirectory->d_name);
     
     strcat(*lDir_buff, mydirectory->d_name);    
     strcat(*lDir_buff, "\n");
@@ -211,12 +266,13 @@ void listDirectory(char **lDir_buff){
 
 
 /******************************************************************
- * Function: 
+ * Function: sendMessage()
  *
  * Use:  
  *      
  *
- * Input: 
+ * Input: int sock_fd:
+ *        char* buffer_s:
  *       
  * Output: 
  *
