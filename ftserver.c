@@ -1,5 +1,5 @@
 
-/***************************************************************
+/**************************************************************************
  * Kierin Doherty (dohertki)
  *
  * ftserver.c: 
@@ -9,7 +9,7 @@
  * output: Server transfers files to a client. File must be in
  *         the same directory as the the server.
  *
- **************************************************************/
+ **************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,14 +37,31 @@ void testFunction(){
 
 void sendMessage(int sock_fd, char* buffer_s);
 
-void beanbagchair(char *c_flag, int c_sockfd){
+void msgScreener(int sock_fd){
 
+    char header[128];
+    char client_flag[32];
+    int data_port;
+    char filename[128];
+    int words;
+    bzero(header,128);
     //need to set up as char switch will no accept a char*
     // this should be in a new thread or process
-    char flag;
+    char flag = 'l';
+    int n;
+    char *ar_Buffer;
+    //Read the header from the client 		   
+    n = read(sock_fd,header,128); //read the header 
+    if (n < 0){
+        perror("ERROR reading from socket");
+        close(sock_fd);
+        exit(1);               
+    }
+    printf("Header %s", header);
+    sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
 
-   char *ar_Buffer;
-
+    printf("Client flag: %s", client_flag); 
+   
     switch(flag){
         case 'g':
             printf("get file\n");
@@ -59,6 +76,7 @@ void beanbagchair(char *c_flag, int c_sockfd){
             // call listDirectory()
             listDirectory(&ar_Buffer);
             // call sendMessage{
+            sendMessage(sock_fd, ar_Buffer);
             //send directory on link Q
             //close Q
             break;
@@ -75,39 +93,14 @@ void beanbagchair(char *c_flag, int c_sockfd){
 void *arbiter(void *s_th){
     
     printf("Entered thread 2 line 79\n");
-    int n;
-    char header[128];
-    char client_flag[32];
-    int data_port;
-    char filename[128];
-    int words;
     int socket_th = (intptr_t)s_th;
-    testFunction(); 
     printf("Thread ptr: %d \n", socket_th);
     /*http://stackoverflow.com/questions/8487380
      /how-to-cast-an-integer-to-void-pointer                */
-   char *ar_Buffer;
+   msgScreener((intptr_t)s_th); 
+   
     
-   // listDirectory(&ar_Buffer);
-    //printf("dir name: %s\n", workingBuffer );
-
-    bzero(header,128);
-    //Read the header from the client 		   
-    n = read(socket_th,header,128); //read the header 
-    if (n < 0){
-        perror("ERROR reading from socket");
-        close(socket_th);
-        exit(1);               
-    }
-    sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
-
-    printf("%s", client_flag); 
-
-
-    sendMessage(socket_th, ar_Buffer);
-
-    
-    //pthread_exit(NULL);
+    pthread_exit(NULL);
 
 }
 
@@ -130,7 +123,8 @@ int main(int argc, char *argv[]){
     int n;
     int socket_fd;
 	int newsock_fd;
-
+    int newsock_t; //maybe an array?
+    
     flag = setPort(argc, argv, &port);
 
 //*****************************************************************
@@ -162,23 +156,18 @@ int main(int argc, char *argv[]){
 ********************** This is where the magic happens *********************
 ****************************************************************************
 ***************************************************************************/
-    int newsock_t; //maybe an array?
-
-    newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
-	if (newsock_fd < 0) 
-        perror("ERROR on accept");
- //   https://computing.llnl.gov/tutorials/pthreads/    
-    printf("Accept returns ptr: %d\n", newsock_fd);
     pthread_t thread[10];
-    n = pthread_create(&thread[0], NULL, arbiter, (void*)(intptr_t)newsock_fd);
-    printf("Thread returns: %d, socket ptr: %d\n", n,  newsock_fd);
-
-
-
-//this is where fork was
-//case 0:  //This is the child
-
+    
     while(1){
+        newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
+	    if (newsock_fd < 0) 
+            perror("ERROR on accept");
+     //   https://computing.llnl.gov/tutorials/pthreads/    
+        printf("Accept returns ptr: %d\n", newsock_fd);
+        n = pthread_create(&thread[0], NULL, arbiter, (void*)(intptr_t)newsock_fd);
+        printf("Thread returns: %d, socket ptr: %d\n", n,  newsock_fd);
+
+
 
     }
     printf("End\n");
