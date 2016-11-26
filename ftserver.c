@@ -29,6 +29,7 @@
 int setPort(int argc_a, char **argv_a, int *port_a);
 
 void listDirectory(char **lDir_buff);
+
 void testFunction(){
     printf("Test function is working\n");
     return;
@@ -37,48 +38,142 @@ void testFunction(){
 
 void sendMessage(int sock_fd, char* buffer_s);
 
-void msgScreener(int sock_fd){
 
+struct clientParam{
+    int socket_fd;    
     char header[128];
     char client_flag[32];
     int data_port;
     char filename[128];
-    int words;
-    bzero(header,128);
-    //need to set up as char switch will no accept a char*
-    // this should be in a new thread or process
-    char flag = 'l';
+    char hostname[256];
+};
+
+
+
+struct clientParam field, *fldPtr;
+
+
+
+void *l_handler(void *l_ptr){
+    
+    
+   // struct clientParam *fieldPtr = intptr_t(l_ptr);
+
+    struct clientParam *fieldPtr;
+    fieldPtr = l_ptr;
+    struct sockaddr_in q_addr;
+    struct hostent *host_e;
+    int q_sockfd;
     int n;
     char *ar_Buffer;
+    
+    printf("Entered thread 'l' line 55\n");
+    /*http://stackoverflow.com/questions/8487380
+     /how-to-cast-an-integer-to-void-pointer 
+     */
+    printf("l Thread hostname: %s\n", fieldPtr->hostname);
+
+    printf("l Thread port: %d\n", fieldPtr->data_port);
+    
+    host_e = gethostbyname(fieldPtr->hostname);
+    if(host_e == NULL)
+        printf("Unable to resolve host name %s\n", fieldPtr->hostname);
+	       
+           
+    bzero((char *) &q_addr, sizeof(q_addr)); //free memory  serv_addr
+    q_addr.sin_family =  AF_INET; 
+    q_addr.sin_port = htons(fieldPtr->data_port);
+    
+    bcopy((char *)host_e->h_addr, 
+	  (char *)&q_addr.sin_addr.s_addr, host_e->h_length);
+   // memset(&q_addr, '\0', sizeof(q_addr); 
+    //memcpy(&(q_addr.sin_addr.s_addr), host_e->h_addr, host_e->h_length);
+    //memcpy(&q_addr.sin_addr, host_e->h_addr, host_e->h_length);
+    //memcpy(&host.sin_addr, host_ip_addr->h_addr, host_ip_addr->h_length);
+    //q_addr.sin_addr.s_addr = inet_addr(server_ip); 
+			
+    // https://www.ibm.com/support/knowledgecenter/SSB23S_1.1.0.12/gtpc2/cpp_gethostbyname.html
+    
+    q_sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if(q_sockfd == -1){
+        perror("Data socket error\n");
+    }
+    printf("@connect address: %s\n", &q_addr);
+    if( connect(q_sockfd, (struct sockaddr*) &q_addr, sizeof(q_addr)) < 0)
+        perror("Data socket connect error\n");
+            
+    //connect to link Q FIXME
+    // call listDirectory()
+    listDirectory(&ar_Buffer);
+    // call sendMessage{
+    sendMessage(q_sockfd, ar_Buffer);
+    //send directory on link Q
+    //close Q
+    close(q_sockfd);
+    
+    pthread_exit(NULL);
+
+}
+
+
+
+    
+
+
+
+
+
+
+
+void msgScreener(int sock_fd){
+
+//    char header[128];
+//    char filename[128];
+    int i;
+    char flag;
+//    struct clientParam field, *fldPtr;
+    fldPtr = &field;
+    pthread_t thread_l[1];
+      
+    
+    
+    bzero(fldPtr->header,128);
+    //need to set up as char switch will no accept a char*
+    // this should be in a new thread or process
     //Read the header from the client 		   
-    n = read(sock_fd,header,128); //read the header 
-    if (n < 0){
+    i = read(sock_fd,fldPtr->header,128); //read the header 
+    if (i < 0){
         perror("ERROR reading from socket");
         close(sock_fd);
         exit(1);               
     }
-    printf("Header %s", header);
-    sscanf(header,"%s  %d  %d %s",client_flag, &data_port, &words, filename); //extract header info
-
-    printf("Client flag: %s", client_flag); 
+    printf("Header %s\n", fldPtr-> header);
+    sscanf(fldPtr->header,"%s %d  %s %s",fldPtr->client_flag, &field.data_port,\
+            fldPtr->hostname, fldPtr->filename); //extract header info
+        
+    printf("Msg  hostname: %s", fldPtr->hostname);
+    if( strcmp( fldPtr->client_flag, "-l") == 0)
+        flag = 'l';
+    else if(strcmp(fldPtr->client_flag, "-g") == 0)
+        flag = 'g';
+    else{
+        printf("Header missing -1 of -g\n");
+    }
+        
+    printf("Client flag: %s\n", fldPtr->client_flag); 
    
     switch(flag){
         case 'g':
             printf("get file\n");
             //connect to link Q FIXME
             //send file of link Q FIXME
-            //close Q FIXME
+           //close Q FIXME
             break;
 
         case 'l':
-            printf("list file\n");
-            //connect to link Q FIXME
-            // call listDirectory()
-            listDirectory(&ar_Buffer);
-            // call sendMessage{
-            sendMessage(sock_fd, ar_Buffer);
-            //send directory on link Q
-            //close Q
+            
+            i = pthread_create(&thread_l[0], NULL, l_handler, (void*)(intptr_t)fldPtr);
+           // printf("Thread returns: %d, field ptr: %u\n", i , fldPtr);
             break;
 
         default:
@@ -243,13 +338,13 @@ void listDirectory(char **lDir_buff){
         }
 
 
-    printf("dir name: %s\n", mydirectory->d_name);
+   // printf("dir name: %s\n", mydirectory->d_name);
     
     strcat(*lDir_buff, mydirectory->d_name);    
     strcat(*lDir_buff, "\n");
 
     }
-    printf("dir name: %s\n", *lDir_buff );
+   // printf("dir name: %s\n", *lDir_buff );
 	return;
 }
 
@@ -270,14 +365,16 @@ void listDirectory(char **lDir_buff){
 void sendMessage(int sock_fd, char* buffer_s){
     int n;
 
-    printf("sizeof: %d\n", (int)sizeof(buffer_s)); 
-    printf("strlen: %d\n", (int)strlen(buffer_s));
+    printf("Send Msg sizeof: %d\n", (int)sizeof(buffer_s)); 
+    printf("Send Msg strlen: %d\n", (int)strlen(buffer_s));
 
     n = send(sock_fd, buffer_s, strlen(buffer_s), 0); 
-//    n = write(newsock_fd, workingBuffer, sizeof(workingBuffer)); //Write back the type of server
-            if (n < 0){
-                perror("ERROR writing to socket");
-            }
+    if (n < 0){
+        perror("ERROR writing to socket");
+        
+    }
+    printf("Byts written to client %d\n", n);
     return;
 
+//    n = write(newsock_fd, workingBuffer, sizeof(workingBuffer)); //Write back the type of server
 }

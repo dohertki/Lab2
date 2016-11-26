@@ -24,7 +24,7 @@ import threading
 
 
 user_entry={'ftserver': None, 'port': None, 'request_flag': None, 
-'filename': None, 'data_port': None}
+'filename': None, 'hostname': None, 'data_port': None}
 
 
 def maxc():
@@ -36,7 +36,7 @@ def maxc():
         user_entry['port'] = int(sys.argv[2])
         user_entry['request_flag'] = sys.argv[3]
         user_entry['data_port'] = int(sys.argv[4])
-        
+        user_entry['hostname'] = socket.gethostname() 
         
         
         print "5 agrs" + str(len(sys.argv))
@@ -77,12 +77,53 @@ def setSocket():
     print 'Socket Created'
     return s
 
+def setServer(clnt):
+# n code for the communicating with network
+# socket is based on network programming tutorial found at:
+# http://www.binarytides.com/python-socket-programming-tutorial/
+    try:
+        sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    except socket.error, msg:
+        print 'Failed to create. socket. Error code: ' + str(msg[0])   
+        sys.exit()
+    print 'Socket Created'
+
+#    sd.setblocking(0)
+    HOST = ' '
+    PORT = clnt['data_port']
+    print 'Data port: ' + str(PORT)
+    try:
+	    sd.bind(('localhost', PORT))
+    except socket.error, msg:
+	    print 'Bind failed. Error Code: ' + str(msg[0]) + ' Message ' + msg[1]
+	    sys.exit()
+
+    sd.listen(5) #Parameter backlog...the number of incoming connection kept waiting
+
+    print 'Socket listening'
+    
+    if sd is None:
+        print ' Socket is not open'
+        sys.exit(1)
+        
+    #wait to accept a connection - blocking call
+    while True:
+        print 'Waiting for connection'               #FIXME this is verbatim    
+        conn, addr = sd.accept()
+ 
+    #display client information
+    print 'Connected with ' + addr[0] + ':' + str(addr[1]) 
+
+    l_reply = sd.recv(4096)
+ 
+    print l_reply
+    conn.close()
+
 def main():
-    
-    
 
     maxc()
 
+    
     s = setSocket()   
    
    #chicken shit VV
@@ -91,11 +132,13 @@ def main():
     s.connect(('',user_entry['port']))
     #change message its off page user_entry.get('request_flag') +
     
-    message ='g ' + str(user_entry.get('data_port')) + ' p00p' + ' myfile'
+    message = user_entry.get('request_flag') + ' '  +  \
+              str(user_entry.get('data_port')) + ' ' + \
+              user_entry.get('hostname') + ' myfile'
     
     print(message)
     
-    time.sleep(1)
+    #time.sleep(1)
 
     #send the header message
     try:
@@ -108,6 +151,12 @@ def main():
     print 'Much success'
 
 
+    t1 = threading.Thread(target = setServer, args =(user_entry,))
+#    t2 = threading.Thread(target = readFile)
+
+    t1.start()
+
+    t1.join()
 
     #Now receive data
     reply = s.recv(4096)
@@ -125,6 +174,9 @@ def readFile():
 
 
 
+
+
+
 '''
 try:
     thread.start_new_thread( readFile,())
@@ -132,11 +184,6 @@ except:
     print("Error, thread failed to start")
   
 '''
-t1 = threading.Thread(target = readFile)
-
-t1.start()
-
-t1.join()
 
 
 
