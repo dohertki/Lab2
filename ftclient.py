@@ -1,18 +1,29 @@
 #!/usr/bin/python
 #-*- coding: utf-8 -*-
 
-"""
-# Python code for the communicating with network
-# socket is based on network programming tutorial found at:
-# http://www.binarytides.com/python-socket-programming-tutorial/
 
-
-
-"""
 
 ###########################################################################
-""" FTP Client
-"""
+#                              ftclient.py                                #
+# Kierin Doherty (dohertki)                                               #
+# CS372 Project  - ftclient.py                                            #
+# 27 Nov 2016                                                             #
+#                                                                         #
+# Description: Program is a simple file transfer client designed to work  #
+#              with ftserver. Files must be text files.                   # 
+#                                                                         #
+#              utilizes TCP via system sockets. Server takes              #
+#              turns exchanging messages with client.                     #
+#                                                                         #
+# Input: The program takes the following argument:                        #
+#                                                                         #
+#                        For directory:                                   #
+# $ ./clientserv.py [ftserver name] [sever port#][-l] [local port#]       #
+#                       For file download:                                #
+#./clientserv.py [ftserver name] [sever port#][-g][filename][local port#] #
+########################################################################### 
+
+
 import socket
 import sys
 import time
@@ -24,6 +35,14 @@ user_entry={'ftserver': None, 'port': None, 'request_flag': None,
 
 
 ########################################################################### 
+#                               maxc()                                    #
+# Use: Function takes command line arguments and places the into the      #
+#      dictionary user_entry. Function checks each entry for some validity#
+#                                                                         #
+# Input: argv[]: Function take command line arguments.                    #
+#                                                                         #
+# Output: Function store values in user_data                              #
+#                                                                         #
 ########################################################################### 
 def maxc():
     print 'hello'
@@ -52,15 +71,20 @@ def maxc():
     else:
         print 'Usage: ./clientserv.py [ftserver name] [sever port#] [-l or -g filename] [local port#]'
         exit()
+    
 
     return user_entry
 
 
 ########################################################################### 
 #                            readMessage(conn)                            # 
-# Use: Function recieves messages to clients connected to the server      #
-# Input: conn: Pointer to a socket connection                             #
-# Output: function prints messages to the screen                          #
+# Use: Reads messages received by the server and return them to the       #
+#      calling function.                                                  #
+#                                                                         #
+# Input: conn: Function takes a pointer to a socket connection            #
+#                                                                         #
+# Output: Function returns ths contents of the message to the calling     #    
+#         function.                                                       #
 ###########################################################################
 
 def readMessage(conn):
@@ -90,6 +114,11 @@ def sendMessage(conn):
     
 ###########################################################################
 #                               setSocket()                               #
+# Use: Function creates a socket and return a pointer to the socket       #
+#                                                                         #
+# Input: Function has no arguments.                                       #
+#                                                                         #
+# Output: Function returns a pointer to a socket.                         #
 # Python code for the communicating with network                          #
 # socket is based on network programming tutorial found at:               # 
 # http://www.binarytides.com/python-socket-programming-tutorial/          #
@@ -106,10 +135,19 @@ def setSocket():
     return s
 
 ###########################################################################
-# Python code for the communicating with network
-# socket is based on network programming tutorial found at:
-# http://www.binarytides.com/python-socket-programming-tutorial/
+#                               setServer()                               #
+# Use: Function sets up a socket,  binds it to an address and then        #
+#      sets program to listens,  ane when a client connects r the function#
+#      then returns a new pointer to the calling function.                #
+#                                                                         #
+# Input: clnt: pointer to user_data dictionary                            #
+#                                                                         #
+# Output: returns a pointer to a new connection                           #
+# Python code for the communicating with network                          #
+# *NOTE socket is based on network programming tutorial found at:         #
+# http://www.binarytides.com/python-socket-programming-tutorial/          #
 ###########################################################################
+
 def setServer(clnt):
     try:
         sd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -140,15 +178,19 @@ def setServer(clnt):
     return conn 
     
 ###########################################################################
-
-
-# #http://www.binarytides.com/receive-full-data-with-the-recv-socket-
-#       function-in-python/
+#                                fileX()                                  #
+# Use: Function receives file from a server and saves it to a new file in #
+#      current working directory.                                         #
+#                                                                         #
+# Input: Function takes a pointer to a socket connection as a parameter.  #
+#                                                                         #
+# Output: Function stores data in current working directory but does not  #
+#         return values to the calling function.                          #
+#*NOTE Timing function is based entirely on code @ http://www.binarytides #
+#.com/receive-full-data-with-the-recv-socket-function-in-python/          #
 ###########################################################################
 def fileX(sockfd):        
 
-    #display client information
-   #print 'Connected with ' + addr[0] + ':' + str(addr[1]) 
        
     file_buffer = '';
     reply = '';
@@ -203,6 +245,12 @@ def fileX(sockfd):
         sys.exit()
 
 ###########################################################################
+#                             buildHeader()                               #
+# Use: Funcion places parameters from commmand line arguments and places  #
+#      them in to a string                                                #
+# Input: Function uses values in the dictionary user_entry                #
+#                                                                         #
+# Output: Function sends the completed string back to calling function    #
 ###########################################################################
 def buildHeader():
 
@@ -223,11 +271,11 @@ def buildHeader():
     print(message)
     return message
 
-###########################################################################
+
+""" main stats here"""
 def main():
 
     maxc()
-
     
     s = setSocket()   
    
@@ -246,18 +294,19 @@ def main():
 
     print 'Much success'
 
+
+    #Now receive data
     reply = s.recv(4096)
     
-    #Now receive data
+    #If getting file 
     if '-g' in user_entry['request_flag']:
         print 'Retrieving File'
         conn = setServer(user_entry)
         fileX(conn)        
 
-        #readMessage(conn)
 
 
-
+    #If getting directory
     if '-l' in user_entry['request_flag']:
         print "Receiving directory"
         conn = setServer(user_entry)
@@ -267,22 +316,7 @@ def main():
     
     conn.close()
     
-
-
-
-
-
-
-
-# File IO code 
-def readFile():
-
-    myfile = open("gulliver.txt","r")
-    small_buffer = myfile.read()
-#    print(small_buffer)
-    myfile.close()
-
-
+    s.close()
 
 
 if __name__ == '__main__':

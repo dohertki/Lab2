@@ -1,8 +1,11 @@
 
 /**************************************************************************
  * Kierin Doherty (dohertki)
+ * CS372 Project 2
+ * 27 NOV 2016
  *
- * ftserver.c: 
+ * ftserver.c: Program is a file transfer server that works in conjunction
+ *             with ftclient.py
  *
  * input: $ ftserver <Port #> 
  *
@@ -49,40 +52,10 @@ struct clientParam{
 struct clientParam field, *fldPtr;
 
 
-int initConnection(char* hostname, int portno) {
-	int sockfd;
-	struct sockaddr_in host;
-	struct hostent* host_ip_addr;
 
-	/* Create socket */
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0) {
-		perror("Creating socket");
-	}
-
-	/* Configure */
-	host_ip_addr = gethostbyname(hostname);
-	memset(&host, '\0', sizeof(host));
-	host.sin_family = AF_INET;
-	host.sin_port = htons(portno);
-	memcpy(&host.sin_addr, host_ip_addr->h_addr, host_ip_addr->h_length);
-
-	/* Initiate connection */
-	if (connect(sockfd, (struct sockaddr *) &host, sizeof(host)) < 0) {
-		perror("Contacting host");
-	}
-
-	return sockfd;
-}
-
-
-// https://www.ibm.com/support/knowledgecenter/SSB23S_1.1.0.12/gtpc2/cpp_gethostbyname.html
-
-// https://www.ibm.com/support/knowledgecenter/SSB23S_1.1.0.12/gtpc2/cpp_gethostbyname.html
 void msgScreener(int sock_fd){
 
     char header[] = "Connected to ftserver\n Don't eat green mushrooms";
-//    char filename[128];
     int i;
     char flag;
     fldPtr = &field;
@@ -121,40 +94,28 @@ void msgScreener(int sock_fd){
         
     printf("Client flag: %s\n", fldPtr->client_flag); 
    
-    switch(flag){
-        case 'g':
+    switch(flag){       
+        case 'g':          //Get file download
             printf("get file %s\n", fldPtr->filename);
-            //connect to link Q FIXME
-            //send file of link Q FIXME
             
             m_sockfd = clientX();
-           // m_sockfd = initConnection(fldPtr->hostname, 30327); //FIXME
-           //close Q FIXME
             i = sendfile(m_sockfd, fldPtr->filename);
-            readMessage(m_sockfd);
             break;
 
-        case 'l':
+        case 'l':      //Get directory information
             printf("180: In case 'l',calling thread\n");
             m_sockfd = clientX();
             printf("clienX returns ptr %d\n", m_sockfd);
-            //connect to link Q FIXME
-    // call listDirectory()
             listDirectory(&ar_Buffer);
             sendMessage(m_sockfd, ar_Buffer);
-            //send directory on link Q
-            readMessage(m_sockfd);
-          //  close(m_sockfd);
-      //      pthread_exit(NULL);
             break;
 
         default:
             printf("errror\n");
             
    }
-   
-            printf("core dumper\n");
-   return;
+   close(m_sockfd);
+      return;
 }
 
 void *arbiter(void *s_th){
@@ -162,23 +123,16 @@ void *arbiter(void *s_th){
     printf("Entered thread 2 line 79\n");
     int socket_th = (intptr_t)s_th;
     printf("Thread ptr: %d \n", socket_th);
+    //*NOTE 
     /*http://stackoverflow.com/questions/8487380
-     /how-to-cast-an-integer-to-void-pointer                */
+     /how-to-cast-an-integer-to-void-pointer      */
        
     
     msgScreener((intptr_t)s_th); 
   
-
-    
-    pthread_exit(NULL);
+ //   pthread_exit((void*) s_th); 
 
 }
-
-
-
-
-
-
 
 
 int main(int argc, char *argv[]){
@@ -186,43 +140,46 @@ int main(int argc, char *argv[]){
       
     int sockfd;
     int n;
-    int port; //FIXME 
-   
+    int port;    
     int socket_fd; 
-    int newsock_t; //maybe an array?
-     
+    int newsock_t; //maybe use an array?
+    void *status; 
     struct sockaddr_in  cli_addr;
     socklen_t clilen;
 	int newsock_fd;
-
+//   *NOTE
+//   Threading code is based on a tutorial @ https://computing.llnl.gov
+//   /tutorials/pthreads/    
+ 
     pthread_t thread[10];
-    
+    pthread_attr_t attr;    
     fldPtr = &field;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     
-    strcpy(fldPtr->filename, "gulliver.txt");
-    
-    if(setPort(argc, argv, &port)) //FIXME 
+       
+    if(setPort(argc, argv, &port))  
         return 1;
 
      
     socket_fd = serverX(port);  
       
 
-    listen(socket_fd,5); // listening socket
+    listen(socket_fd,5); 
     clilen = sizeof(cli_addr);
-    
+    int t = 0;
     while(1){
+        
         newsock_fd = accept(socket_fd, (struct sockaddr *) &cli_addr, &clilen);
 	    if (newsock_fd < 0) 
             perror("ERROR on accept");
- 
-     //   https://computing.llnl.gov/tutorials/pthreads/    
-        printf("Accept returns ptr: %d\n", newsock_fd);
-        n = pthread_create(&thread[0], NULL, arbiter, (void*)(intptr_t)newsock_fd);
-        printf("Thread returns: %d, socket ptr: %d\n", n,  newsock_fd);
-
-
-  
+        printf("New Connection\n"); 
+        n = pthread_create(&thread[t], &attr, arbiter, (void*)(intptr_t)newsock_fd);
+   
+   
+     //   pthread_attr_destroy(&attr);
+     //   n = pthread_join(thread[t],&status);
+   
     }
   
     printf("End\n");
@@ -236,15 +193,20 @@ int main(int argc, char *argv[]){
 
 
 /***************************************************************************
- * Function: ()
+ * Function: serverX()
  *
- * Use:  
+ * Use:  Function sets up a socket to be used by the server. Function take
+ *       an integer as an argument for the server port number.
  *      
  *
- * Input: 
+ * Input: int port: The server port number. 
  *       
- * Output: 
+ * Output: Function returns a pointer to the socket that it created.
  *
+ * *NOTE(1): code is referenced from client code from http://beej.us/guide/
+ *  bgnet/output/html/singlepage/bgnet.html#connect
+ * *NOTE(2) code refenced from  https://www.ibm.com/support/knowledgecenter
+ *  /SSB23S_1.1.0.12/gtpc2/cpp_gethostbyname.html
  ***************************************************************************/
 
 int serverX(int port){
@@ -270,7 +232,7 @@ int serverX(int port){
     
 	if (bind(socket_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
         perror("ERROR on binding\n");
-        exit(1);    //FIXME
+        exit(1);    
     }
 
     printf("Socket returns ptr: %d\n", socket_fd);
@@ -279,14 +241,17 @@ int serverX(int port){
 /***************************************************************************
  * Function: clientX()
  *
- * Use:  
- *      
+ * Use:  Function acts a  a client. Function sets up socket and connects to
+ *       host and port number found in clientParam struct members 'hostname'
+ *       and 'data_port'.
  *
- * Input: 
+ * Input: Function use global variable i clientParam struct 'user_entry'.
  *       
- * Output: 
+ * Output: Function returns a pointer to a connectec socket.
  *
- ***************************************************************************/
+ * *NOTE(1): code is referenced from client code from http://beej.us/guide/
+ *  bgnet/output/html/singlepage/bgnet.html#connect
+***************************************************************************/
 int clientX(){
     
     struct sockaddr_in q_addr;
@@ -303,17 +268,10 @@ int clientX(){
     struct addrinfo hints, *res, *p;
     struct addrinfo *servinfo;  // will point to the results
     char ipstr[INET6_ADDRSTRLEN]; 
-   printf("64\n");
-
-    
+    /*see NOTE*/
     memset(&hints, 0, sizeof hints); // make sure the struct is empty
     hints.ai_family = AF_UNSPEC;     //
-    hints.ai_socktype = SOCK_STREAM; // TCP stream sockets
-    printf("318: port of c client %s\n", fldPtr->data_port);
-    
-
-    
-
+    hints.ai_socktype = SOCK_STREAM; 
     if ((status = getaddrinfo(fldPtr->hostname, fldPtr->data_port , &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
     return 2;
@@ -341,7 +299,7 @@ int clientX(){
 
 
     freeaddrinfo(res); 
-//FIXME set pointer to null if fail.
+
 
     return q_sockfd; 
 
@@ -349,12 +307,14 @@ int clientX(){
 /***************************************************************************
  * Function: sendFile()
  *
- * Use:  
- *      
+ * Use: Function accepts a socket pointer and a filename. If file is in 
+ *      present working directory it will be sent on the connection at the
+ *      socket. 
  *
- * Input: 
+ * Input: int sockfd_s: Pointer to a socket connection
+ *        char* filename_s: A file name to a file in current directory
  *       
- * Output: 
+ * Output: Function returns a value of 1 if file cant be opened or 0 otherwise
  *
  ***************************************************************************/
 int sendfile(int sockfd_s, char* filename_s){
@@ -391,16 +351,14 @@ int sendfile(int sockfd_s, char* filename_s){
         }
     }
 
-    printf("%s\n", read_buffer);
+    printf("File sent: %s\n", fldPtr->filename);
+    printf("To Host: %s @ port: %s\n", fldPtr->hostname, fldPtr->data_port); 
     printf("File size: %ld\n", file_size);
-    printf("Bytes written to client %d\n", n);
-    
-    fclose(in);
+    printf("Bytes written to client %d\n", n); 
 
     return 0;
 
 }
-
 
 /***************************************************************************
  * Function: setPort()
@@ -409,22 +367,23 @@ int sendfile(int sockfd_s, char* filename_s){
  *      variable.
  *      
  *
- * Input: int argc_a:
- *        char **argv_a:
- *        int *port_a:
+ * Input: int argc_a: number of arguments on commmand line
+ *        char **argv_a: an array of strings holding command line arguments
+ *        int *port_a: a pointer to location of the value of port.
  *       
  * Output: Function returns a value of '0' on success and '1' on failure.
  *
  ***************************************************************************/
 int setPort(int argc_a, char **argv_a, int *port_a){
     int flag = 0;
-    printf("args %d\n", argc_a);
-    if(argc_a == 2){
+    
+    if(argc_a == 2 && atoi(argv_a[1]) > 1024 && atoi(argv_a[1]) < 65536){
         *port_a = atoi(argv_a[1]);
     
     }else{
-        printf("Missing arguments\n usage:  ./ftserver [server-port#]\n");
+        printf("Port number needed (1025-65500)\nFormat useage:  ./ftserver [server-port#]\n");
         flag = 1;
+
     }
     
     return flag;
@@ -442,7 +401,7 @@ int sendfile(int sockfd_s, char* filename_s){
  * Input: char **lDir_buff: Pointer to a char Pointer holding a buffer
  *            with list directory contents.
  *       
- * Output: 
+ * Output: Function returns void
  *
  ***************************************************************************/
 void listDirectory(char **lDir_buff){
@@ -453,7 +412,6 @@ void listDirectory(char **lDir_buff){
 	struct dirent *mydirectory;
 	dirPtr = opendir(".");
     if (dirPtr == NULL){
-        //strerr
         return;
     }
     
@@ -462,37 +420,34 @@ void listDirectory(char **lDir_buff){
         if(mydirectory == NULL)
             break;
         
-     //   printf("@[0]: %c\n", mydirectory->d_name[0]);
         if(strncmp(mydirectory->d_name, ".", 1) == 0  ){
-      //      printf("continue\n");
-      //      printf("passed name: %s\n", mydirectory->d_name);
             continue;
         }
 
 
-   // printf("dir name: %s\n", mydirectory->d_name);
     
     strcat(*lDir_buff, mydirectory->d_name);    
     strcat(*lDir_buff, "\n");
 
-    }
-   // printf("dir name: %s\n", *lDir_buff );
+    }  
 	return;
 }
 
 
-/******************************************************************
+/**************************************************************************
  * Function: sendMessage()
  *
- * Use:  
+ * Use: Function sends a stored character string to to a socket 
+ *      pointed to by a pointer passed into one of the parameters
  *      
  *
- * Input: int sock_fd:
- *        char* buffer_s:
+ * Input: int sock_fd:  Pointer to a connected socket
+ *        char* buffer_s: Pointer to a string that will be sent
+ *        on connection
  *       
- * Output: 
+ * Output: Function is void, but displays result to screen.
  *
- ******************************************************************/
+ *************************************************************************/
 
 void sendMessage(int sock_fd, char* buffer_s){
     int n;
@@ -511,7 +466,7 @@ void sendMessage(int sock_fd, char* buffer_s){
 
 }
 
-/******************************************************************************
+/***************************************************************************
  * Function: readMessage()
  *
  * Use: Function reads incomming messages from socket connection and prints 
@@ -519,9 +474,9 @@ void sendMessage(int sock_fd, char* buffer_s){
  *
  * Input: int sockfd_r: Pointer to a socket.
  *       
- * Output: The function returns void, incoming messages are sent display(stdout)
+ * Output: The function returns void, incoming messages are sent to display
  *
- *****************************************************************************/
+ **************************************************************************/
 void readMessage(int sockfd_r){
     int n;
     char small_buffer[1024];
@@ -536,20 +491,6 @@ void readMessage(int sockfd_r){
     return;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
